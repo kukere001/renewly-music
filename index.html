@@ -25,8 +25,7 @@
       <button onclick="switchTab(0)" class="hover:text-orange-400">Главная</button>
       <button onclick="switchTab(1)" class="hover:text-orange-400">Поиск</button>
       <button onclick="switchTab(2)" class="hover:text-orange-400">Артисты</button>
-      <button onclick="switchTab(3)" class="hover:text-orange-400">Плейлисты</button>
-      <button onclick="switchTab(4)" class="hover:text-orange-400">Библиотека</button>
+      <button onclick="switchTab(3)" class="hover:text-orange-400">Библиотека ❤️</button>
     </div>
   </div>
 </header>
@@ -41,7 +40,7 @@
 
   <!-- Поиск -->
   <div id="tab-1" class="hidden">
-    <input id="search-input" placeholder="Треки, артисты, плейлисты..." 
+    <input id="search-input" placeholder="Поиск треков или артистов..." 
            class="w-full bg-zinc-900 border border-zinc-700 rounded-3xl py-6 px-8 text-xl mb-8" 
            onkeypress="if(event.key==='Enter') globalSearch()">
     <div id="search-results" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6"></div>
@@ -49,23 +48,15 @@
 
   <!-- Артисты -->
   <div id="tab-2" class="hidden">
-    <input id="username-input" placeholder="Username артиста (kaiangel, madk1d...)" 
+    <input id="username-input" placeholder="Username (kaiangel, madk1d...)" 
            class="w-full bg-zinc-900 border border-zinc-700 rounded-3xl py-6 px-8 text-xl mb-6">
     <button onclick="loadArtistProfile()" class="bg-orange-500 px-10 py-4 rounded-3xl">Загрузить профиль</button>
     <div id="artist-content" class="mt-10"></div>
   </div>
 
-  <!-- Плейлисты -->
-  <div id="tab-3" class="hidden">
-    <input id="playlist-url" placeholder="Вставь ссылку на плейлист SoundCloud" 
-           class="w-full bg-zinc-900 border border-zinc-700 rounded-3xl py-6 px-8 text-xl mb-6">
-    <button onclick="loadPlaylist()" class="bg-orange-500 px-10 py-4 rounded-3xl">Загрузить плейлист</button>
-    <div id="playlist-content" class="mt-10"></div>
-  </div>
-
   <!-- Библиотека -->
-  <div id="tab-4" class="hidden">
-    <h2 class="text-3xl font-bold mb-6">Избранное</h2>
+  <div id="tab-3" class="hidden">
+    <h2 class="text-3xl font-bold mb-6">Моя библиотека ❤️</h2>
     <div id="library" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6"></div>
   </div>
 </div>
@@ -85,12 +76,17 @@
   function switchTab(n) {
     document.querySelectorAll('[id^="tab-"]').forEach(t => t.classList.add('hidden'));
     document.getElementById(`tab-${n}`).classList.remove('hidden');
-    if (n === 4) renderLibrary();
+    if (n === 3) renderLibrary();
   }
 
-  async function api(url) {
-    const res = await fetch(`https://corsproxy.io/?${url}&client_id=${CLIENT_ID}`);
-    return res.json();
+  async function api(endpoint) {
+    try {
+      const res = await fetch(`https://corsproxy.io/?${endpoint}&client_id=${CLIENT_ID}`);
+      return await res.json();
+    } catch(e) {
+      console.error(e);
+      return { collection: [] };
+    }
   }
 
   // Главная - Тренды
@@ -99,7 +95,7 @@
     renderGrid(data.collection || [], 'charts');
   }
 
-  // Поиск
+  // Глобальный поиск
   async function globalSearch() {
     const q = document.getElementById('search-input').value.trim();
     if (!q) return;
@@ -114,41 +110,47 @@
     if (!username) return;
     switchTab(2);
 
-    const user = await api(`https://api.soundcloud.com/resolve?url=https://soundcloud.com/${username}`);
-    const tracks = await api(`https://api-v2.soundcloud.com/users/${user.id}/tracks?limit=15`);
-    const playlists = await api(`https://api-v2.soundcloud.com/users/${user.id}/playlists?limit=10`);
+    try {
+      const user = await api(`https://api.soundcloud.com/resolve?url=https://soundcloud.com/${username}`);
+      const tracks = await api(`https://api-v2.soundcloud.com/users/${user.id}/tracks?limit=20`);
 
-    let html = `
-      <div class="flex gap-8 items-center bg-zinc-900 rounded-3xl p-8">
-        <img src="${user.avatar_url.replace('-large', '-t500x500')}" class="w-40 h-40 rounded-3xl">
-        <div>
-          <h2 class="text-4xl font-bold">${user.username}</h2>
-          <p class="text-2xl text-zinc-400">${user.full_name || ''}</p>
-          <p class="text-orange-400">${user.followers_count.toLocaleString()} подписчиков</p>
-        </div>
-      </div>`;
+      let html = `
+        <div class="flex gap-8 bg-zinc-900 rounded-3xl p-8">
+          <img src="${user.avatar_url.replace('-large', '-t500x500')}" class="w-40 h-40 rounded-3xl object-cover">
+          <div>
+            <h2 class="text-4xl font-bold">${user.username}</h2>
+            <p class="text-zinc-400 text-xl">${user.full_name || ''}</p>
+            <p class="text-orange-400">${user.followers_count.toLocaleString()} подписчиков</p>
+          </div>
+        </div>`;
 
-    html += `<h3 class="text-2xl font-bold mt-10 mb-6">Треки</h3><div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6" id="artist-tracks"></div>`;
-    document.getElementById('artist-content').innerHTML = html;
+      html += `<h3 class="text-2xl font-bold mt-10 mb-6">Треки</h3><div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6" id="artist-tracks"></div>`;
+      document.getElementById('artist-content').innerHTML = html;
 
-    renderGrid(tracks.collection || [], 'artist-tracks');
+      renderGrid(tracks.collection || [], 'artist-tracks');
+    } catch(e) {
+      document.getElementById('artist-content').innerHTML = `<p class="text-red-400">Не удалось загрузить профиль. Проверь username.</p>`;
+    }
   }
 
   function renderGrid(items, containerId) {
-    const container = document.getElementById(containerId) || document.createElement('div');
-    if (!container.id) container.id = containerId;
+    const container = document.getElementById(containerId);
     container.innerHTML = '';
 
     items.forEach(item => {
       if (item.kind !== "track") return;
       const div = document.createElement('div');
-      div.className = "bg-zinc-900 rounded-3xl overflow-hidden cursor-pointer card-hover";
+      div.className = "bg-zinc-900 rounded-3xl overflow-hidden cursor-pointer card-hover relative";
       div.innerHTML = `
         <img src="${item.artwork_url.replace('-large', '-t500x500')}" class="w-full aspect-square object-cover">
         <div class="p-4">
           <div class="font-medium line-clamp-2">${item.title}</div>
           <div class="text-zinc-400 text-sm">${item.user.username}</div>
-        </div>`;
+        </div>
+        <button onclick="event.stopImmediatePropagation(); toggleFavorite(${JSON.stringify(item).replace(/"/g,'&quot;')});" 
+                class="absolute top-3 right-3 text-2xl ${favorites.some(f => f.id === item.id) ? 'text-red-500' : 'text-white/50 hover:text-white'}">
+          ❤️
+        </button>`;
       div.onclick = () => playTrack(item.permalink_url, item.title, item.user.username, item.artwork_url);
       container.appendChild(div);
     });
@@ -164,22 +166,26 @@
     document.getElementById('player-bar').classList.add('hidden');
   }
 
-  async function loadPlaylist() {
-    const url = document.getElementById('playlist-url').value.trim();
-    if (!url) return;
-    switchTab(3);
-    // Можно расширить позже
-    document.getElementById('playlist-content').innerHTML = `<p class="text-center">Загрузка плейлиста...</p>`;
+  function toggleFavorite(track) {
+    const index = favorites.findIndex(f => f.id === track.id);
+    if (index === -1) {
+      favorites.push(track);
+    } else {
+      favorites.splice(index, 1);
+    }
+    localStorage.setItem('renewly_favorites', JSON.stringify(favorites));
+    renderGrid(favorites, 'library'); // обновляем библиотеку
+    alert(index === -1 ? "✅ Добавлено в библиотеку" : "🗑️ Удалено из библиотеки");
   }
 
   function renderLibrary() {
-    const div = document.getElementById('library');
-    div.innerHTML = favorites.length ? '' : '<p class="col-span-full text-center text-zinc-400 py-20">В библиотеке пока пусто</p>';
-    // Можно добавить избранное позже
+    renderGrid(favorites, 'library');
   }
 
   // Инициализация
-  window.onload = loadCharts;
+  window.onload = () => {
+    loadCharts();
+  };
 </script>
 </body>
 </html>

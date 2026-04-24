@@ -24,42 +24,33 @@
   <div id="results" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6"></div>
 </div>
 
-<!-- ПЛЕЕР -->
-<div id="player-bar" class="fixed bottom-0 left-0 right-0 bg-zinc-900 border-t border-white/10 hidden p-4">
-  <div class="max-w-6xl mx-auto flex items-center gap-5">
-    <img id="cover" class="w-16 h-16 rounded-2xl object-cover">
-    <div class="flex-1 min-w-0">
-      <div id="title" class="font-bold text-lg truncate"></div>
-      <div id="artist" class="text-zinc-400 text-sm truncate"></div>
-    </div>
-    <button onclick="togglePlay()" id="play-btn" class="text-5xl text-orange-500"><i class="fa-solid fa-play"></i></button>
+<!-- Embed плеер -->
+<div id="embed-player" class="fixed bottom-0 left-0 right-0 bg-zinc-900 border-t border-white/10 hidden p-4 z-50">
+  <div class="max-w-6xl mx-auto">
+    <div id="embed-container"></div>
   </div>
-  <audio id="audio" class="hidden"></audio>
 </div>
 
 <script>
   const CLIENT_ID = "RF8yvumNwWwVg0aX4r7fHqzIVAtO6nSI";
-  const PROXY = "https://corsproxy.io/?";
-
-  let currentAudio = null;
 
   async function searchMusic() {
     const query = document.getElementById('search-input').value.trim();
     if (!query) return;
 
     const resultsDiv = document.getElementById('results');
-    resultsDiv.innerHTML = `<p class="col-span-full text-center text-zinc-400 py-10">Ищем...</p>`;
+    resultsDiv.innerHTML = `<p class="col-span-full text-center text-zinc-400 py-12">Ищем...</p>`;
 
     try {
-      const url = `${PROXY}https://api-v2.soundcloud.com/search?q=${encodeURIComponent(query)}&client_id=${CLIENT_ID}&limit=30`;
+      const url = `https://corsproxy.io/?https://api-v2.soundcloud.com/search?q=${encodeURIComponent(query)}&client_id=${CLIENT_ID}&limit=30`;
       const res = await fetch(url);
       const data = await res.json();
 
       let html = '';
       data.collection.forEach(item => {
-        if (item.kind === "track" && item.artwork_url) {
+        if (item.kind === "track") {
           html += `
-            <div onclick="playTrack(${JSON.stringify(item).replace(/"/g, '&quot;')})" 
+            <div onclick="playEmbed('${item.permalink_url}')" 
                  class="bg-zinc-900 rounded-3xl overflow-hidden cursor-pointer hover:scale-105 transition-all">
               <img src="${item.artwork_url.replace('-large', '-t500x500')}" class="w-full aspect-square object-cover">
               <div class="p-4">
@@ -70,41 +61,21 @@
         }
       });
 
-      resultsDiv.innerHTML = html || `<p class="col-span-full text-center">Ничего не найдено</p>`;
+      resultsDiv.innerHTML = html || `<p class="col-span-full text-center text-zinc-400">Ничего не найдено</p>`;
     } catch(e) {
       resultsDiv.innerHTML = `<p class="col-span-full text-center text-red-400">Ошибка загрузки</p>`;
     }
   }
 
-  async function playTrack(track) {
-    const proxyUrl = `${PROXY}https://api-v2.soundcloud.com/tracks/${track.id}/streams?client_id=${CLIENT_ID}`;
-    const res = await fetch(proxyUrl);
-    const data = await res.json();
-    const streamUrl = data.http_mp3_128_url;
+  function playEmbed(trackUrl) {
+    const embedUrl = `https://w.soundcloud.com/player/?url=${encodeURIComponent(trackUrl)}&color=%23f97316&auto_play=true&visual=true&single_active=true`;
 
-    if (streamUrl) {
-      if (currentAudio) currentAudio.pause();
-      
-      currentAudio = new Audio(streamUrl);
-      currentAudio.play();
+    document.getElementById('embed-container').innerHTML = `
+      <iframe width="100%" height="500" scrolling="no" frameborder="no" 
+              src="${embedUrl}" allow="autoplay">
+      </iframe>`;
 
-      document.getElementById('cover').src = track.artwork_url.replace('-large', '-t500x500');
-      document.getElementById('title').textContent = track.title;
-      document.getElementById('artist').textContent = track.user.username;
-      document.getElementById('player-bar').classList.remove('hidden');
-      document.getElementById('play-btn').innerHTML = '<i class="fa-solid fa-pause"></i>';
-    }
-  }
-
-  function togglePlay() {
-    if (!currentAudio) return;
-    if (currentAudio.paused) {
-      currentAudio.play();
-      document.getElementById('play-btn').innerHTML = '<i class="fa-solid fa-pause"></i>';
-    } else {
-      currentAudio.pause();
-      document.getElementById('play-btn').innerHTML = '<i class="fa-solid fa-play"></i>';
-    }
+    document.getElementById('embed-player').classList.remove('hidden');
   }
 </script>
 </body>

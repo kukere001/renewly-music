@@ -9,89 +9,102 @@
 </head>
 <body class="bg-zinc-950 text-white min-h-screen">
 
-  <div class="max-w-5xl mx-auto p-6">
+<div class="max-w-6xl mx-auto p-6">
+  <h1 class="text-5xl font-bold text-center mb-10">RenewlyMusic</h1>
 
-    <h1 class="text-5xl font-bold text-center mb-10 neon">RenewlyMusic</h1>
-
-    <div class="max-w-xl mx-auto">
-      <input id="search-input" placeholder="kai angel, romance, 9mice..." 
-             class="w-full bg-zinc-900 border border-zinc-700 rounded-3xl py-6 px-8 text-xl mb-4">
-      <button onclick="searchMusic()" 
-              class="w-full bg-gradient-to-r from-orange-500 to-red-500 py-5 rounded-3xl text-xl font-bold">
-        Искать
-      </button>
-    </div>
-
-    <div id="results" class="mt-10 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6"></div>
+  <div class="max-w-2xl mx-auto mb-10">
+    <input id="search-input" placeholder="Поиск трека или артиста..." 
+           class="w-full bg-zinc-900 border border-zinc-700 rounded-3xl py-6 px-8 text-xl">
+    <button onclick="searchMusic()" 
+            class="mt-4 w-full bg-gradient-to-r from-orange-500 to-red-500 py-5 rounded-3xl text-xl font-bold">
+      Искать
+    </button>
   </div>
 
-  <!-- Плеер -->
-  <div id="player" class="fixed bottom-0 left-0 right-0 bg-zinc-900 p-4 hidden">
-    <div class="max-w-5xl mx-auto flex items-center gap-4">
-      <img id="cover" class="w-16 h-16 rounded-2xl">
-      <div class="flex-1">
-        <div id="title" class="font-bold"></div>
-        <div id="artist" class="text-zinc-400"></div>
-      </div>
-      <button onclick="togglePlay()" id="playpause" class="text-4xl">▶</button>
+  <div id="results" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6"></div>
+</div>
+
+<!-- ПЛЕЕР -->
+<div id="player-bar" class="fixed bottom-0 left-0 right-0 bg-zinc-900 border-t border-white/10 hidden p-4">
+  <div class="max-w-6xl mx-auto flex items-center gap-5">
+    <img id="cover" class="w-16 h-16 rounded-2xl object-cover">
+    <div class="flex-1 min-w-0">
+      <div id="title" class="font-bold text-lg truncate"></div>
+      <div id="artist" class="text-zinc-400 text-sm truncate"></div>
     </div>
+    <button onclick="togglePlay()" id="play-btn" class="text-5xl text-orange-500"><i class="fa-solid fa-play"></i></button>
   </div>
+  <audio id="audio" class="hidden"></audio>
+</div>
 
 <script>
   const CLIENT_ID = "RF8yvumNwWwVg0aX4r7fHqzIVAtO6nSI";
-  const CORS_PROXY = "https://corsproxy.io/?";
+  const PROXY = "https://corsproxy.io/?";
+
+  let currentAudio = null;
 
   async function searchMusic() {
     const query = document.getElementById('search-input').value.trim();
     if (!query) return;
 
     const resultsDiv = document.getElementById('results');
-    resultsDiv.innerHTML = `<p class="text-center text-zinc-400">Ищем...</p>`;
+    resultsDiv.innerHTML = `<p class="col-span-full text-center text-zinc-400 py-10">Ищем...</p>`;
 
     try {
-      const url = `${CORS_PROXY}https://api-v2.soundcloud.com/search?q=${encodeURIComponent(query)}&client_id=${CLIENT_ID}&limit=20`;
+      const url = `${PROXY}https://api-v2.soundcloud.com/search?q=${encodeURIComponent(query)}&client_id=${CLIENT_ID}&limit=30`;
       const res = await fetch(url);
       const data = await res.json();
 
       let html = '';
       data.collection.forEach(item => {
-        if (item.kind === "track") {
+        if (item.kind === "track" && item.artwork_url) {
           html += `
-            <div onclick="play('${item.id}', '${item.title}', '${item.user.username}', '${item.artwork_url}')" 
-                 class="bg-zinc-900 rounded-3xl overflow-hidden cursor-pointer hover:scale-105 transition">
+            <div onclick="playTrack(${JSON.stringify(item).replace(/"/g, '&quot;')})" 
+                 class="bg-zinc-900 rounded-3xl overflow-hidden cursor-pointer hover:scale-105 transition-all">
               <img src="${item.artwork_url.replace('-large', '-t500x500')}" class="w-full aspect-square object-cover">
               <div class="p-4">
                 <div class="font-medium line-clamp-2">${item.title}</div>
-                <div class="text-sm text-zinc-400">${item.user.username}</div>
+                <div class="text-zinc-400 text-sm">${item.user.username}</div>
               </div>
             </div>`;
         }
       });
-      resultsDiv.innerHTML = html || "<p class='text-center'>Ничего не найдено</p>";
+
+      resultsDiv.innerHTML = html || `<p class="col-span-full text-center">Ничего не найдено</p>`;
     } catch(e) {
-      resultsDiv.innerHTML = `<p class="text-red-400 text-center">Ошибка прокси. Попробуй позже.</p>`;
+      resultsDiv.innerHTML = `<p class="col-span-full text-center text-red-400">Ошибка загрузки</p>`;
     }
   }
 
-  async function play(id, title, artist, artwork) {
-    const proxyUrl = `${CORS_PROXY}https://api-v2.soundcloud.com/tracks/${id}/streams?client_id=${CLIENT_ID}`;
+  async function playTrack(track) {
+    const proxyUrl = `${PROXY}https://api-v2.soundcloud.com/tracks/${track.id}/streams?client_id=${CLIENT_ID}`;
     const res = await fetch(proxyUrl);
     const data = await res.json();
     const streamUrl = data.http_mp3_128_url;
 
     if (streamUrl) {
-      const audio = new Audio(streamUrl);
-      audio.play();
+      if (currentAudio) currentAudio.pause();
+      
+      currentAudio = new Audio(streamUrl);
+      currentAudio.play();
 
-      document.getElementById('cover').src = artwork.replace('-large', '-t500x500');
-      document.getElementById('title').textContent = title;
-      document.getElementById('artist').textContent = artist;
-      document.getElementById('player').classList.remove('hidden');
+      document.getElementById('cover').src = track.artwork_url.replace('-large', '-t500x500');
+      document.getElementById('title').textContent = track.title;
+      document.getElementById('artist').textContent = track.user.username;
+      document.getElementById('player-bar').classList.remove('hidden');
+      document.getElementById('play-btn').innerHTML = '<i class="fa-solid fa-pause"></i>';
     }
   }
 
   function togglePlay() {
-    alert("Плеер в разработке. Сейчас просто играет трек.");
+    if (!currentAudio) return;
+    if (currentAudio.paused) {
+      currentAudio.play();
+      document.getElementById('play-btn').innerHTML = '<i class="fa-solid fa-pause"></i>';
+    } else {
+      currentAudio.pause();
+      document.getElementById('play-btn').innerHTML = '<i class="fa-solid fa-play"></i>';
+    }
   }
 </script>
 </body>

@@ -13,8 +13,8 @@
   <h1 class="text-5xl font-bold text-center mb-10">RenewlyMusic</h1>
 
   <div class="max-w-2xl mx-auto mb-10">
-    <input id="search-input" placeholder="madk1d, kai angel, гимн россии..." 
-           class="w-full bg-zinc-900 border border-zinc-700 rounded-3xl py-6 px-8 text-xl">
+    <input id="search-input" placeholder="madk1d, kai angel, гимн россии, липстик..." 
+           class="w-full bg-zinc-900 border border-zinc-700 rounded-3xl py-6 px-8 text-xl focus:outline-none focus:border-orange-500">
     <button onclick="searchMusic()" 
             class="mt-4 w-full bg-gradient-to-r from-orange-500 to-red-500 py-5 rounded-3xl text-xl font-bold">
       Искать
@@ -24,29 +24,22 @@
   <div id="results" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6"></div>
 </div>
 
-<!-- Кастомный мини-плеер -->
-<div id="player-bar" class="fixed bottom-0 left-0 right-0 bg-zinc-900 border-t border-white/10 hidden z-50 p-4">
-  <div class="max-w-6xl mx-auto flex items-center gap-5">
-    <img id="cover" class="w-16 h-16 rounded-2xl object-cover">
-    <div class="flex-1 min-w-0">
-      <div id="title" class="font-semibold truncate"></div>
-      <div id="artist" class="text-zinc-400 text-sm truncate"></div>
-    </div>
+<!-- Компактный Embed плеер -->
+<div id="player-bar" class="fixed bottom-0 left-0 right-0 bg-zinc-900 border-t border-white/10 hidden z-50">
+  <div class="max-w-6xl mx-auto p-4 relative">
     
-    <div class="flex items-center gap-8 text-4xl">
-      <button onclick="prevTrack()" class="hover:text-orange-400"><i class="fa-solid fa-backward"></i></button>
-      <button onclick="togglePlay()" id="play-btn" class="text-5xl text-orange-500"><i class="fa-solid fa-play"></i></button>
-      <button onclick="nextTrack()" class="hover:text-orange-400"><i class="fa-solid fa-forward"></i></button>
-    </div>
-  </div>
+    <!-- Кнопка закрытия -->
+    <button onclick="closePlayer()" 
+            class="absolute -top-4 right-4 bg-zinc-800 hover:bg-red-600 w-8 h-8 rounded-full flex items-center justify-center text-xl shadow-md">
+      ✕
+    </button>
 
-  <!-- Скрытый Embed -->
-  <iframe id="soundcloud-iframe" width="100%" height="0" scrolling="no" frameborder="no" class="hidden"></iframe>
+    <div id="embed-container"></div>
+  </div>
 </div>
 
 <script>
-  let widget = null;
-  let currentTrackUrl = "";
+  const CLIENT_ID = "RF8yvumNwWwVg0aX4r7fHqzIVAtO6nSI";
 
   async function searchMusic() {
     const query = document.getElementById('search-input').value.trim();
@@ -56,7 +49,7 @@
     div.innerHTML = `<p class="col-span-full text-center py-20 text-zinc-400">Ищем...</p>`;
 
     try {
-      const res = await fetch(`https://corsproxy.io/?https://api-v2.soundcloud.com/search?q=${encodeURIComponent(query)}&client_id=RF8yvumNwWwVg0aX4r7fHqzIVAtO6nSI&limit=30`);
+      const res = await fetch(`https://corsproxy.io/?https://api-v2.soundcloud.com/search?q=${encodeURIComponent(query)}&client_id=${CLIENT_ID}&limit=30`);
       const data = await res.json();
 
       let html = '';
@@ -64,8 +57,9 @@
         if (item.kind === "track") {
           html += `
             <div onclick="playTrack('${item.permalink_url}', '${item.title}', '${item.user.username}', '${item.artwork_url}')" 
-                 class="bg-zinc-900 rounded-3xl overflow-hidden cursor-pointer hover:scale-105 transition">
-              <img src="${item.artwork_url.replace('-large', '-t500x500')}" class="w-full aspect-square object-cover">
+                 class="bg-zinc-900 rounded-3xl overflow-hidden cursor-pointer hover:scale-105 transition-all">
+              <img src="${item.artwork_url ? item.artwork_url.replace('-large', '-t500x500') : ''}" 
+                   class="w-full aspect-square object-cover">
               <div class="p-4">
                 <div class="font-medium line-clamp-2">${item.title}</div>
                 <div class="text-zinc-400 text-sm">${item.user.username}</div>
@@ -73,6 +67,7 @@
             </div>`;
         }
       });
+
       div.innerHTML = html || `<p class="col-span-full text-center text-zinc-400">Ничего не найдено</p>`;
     } catch(e) {
       div.innerHTML = `<p class="col-span-full text-center text-red-400">Ошибка соединения</p>`;
@@ -80,40 +75,19 @@
   }
 
   function playTrack(url, title, artist, artwork) {
-    currentTrackUrl = url;
+    const embedUrl = `https://w.soundcloud.com/player/?url=${encodeURIComponent(url)}&color=%23f97316&auto_play=true&visual=false&single_active=true&height=280`;
 
-    const iframe = document.getElementById('soundcloud-iframe');
-    iframe.src = `https://w.soundcloud.com/player/?url=${encodeURIComponent(url)}&color=%23f97316&auto_play=true&visual=false&single_active=true`;
+    document.getElementById('embed-container').innerHTML = `
+      <iframe width="100%" height="280" scrolling="no" frameborder="no" 
+              src="${embedUrl}" allow="autoplay"></iframe>`;
 
-    document.getElementById('cover').src = artwork.replace('-large', '-t500x500');
-    document.getElementById('title').textContent = title;
-    document.getElementById('artist').textContent = artist;
     document.getElementById('player-bar').classList.remove('hidden');
-    document.getElementById('play-btn').innerHTML = '<i class="fa-solid fa-pause"></i>';
-
-    // Инициализация Widget API
-    widget = SC.Widget(iframe);
   }
 
-  function togglePlay() {
-    if (widget) {
-      widget.isPaused((paused) => {
-        if (paused) {
-          widget.play();
-          document.getElementById('play-btn').innerHTML = '<i class="fa-solid fa-pause"></i>';
-        } else {
-          widget.pause();
-          document.getElementById('play-btn').innerHTML = '<i class="fa-solid fa-play"></i>';
-        }
-      });
-    }
+  function closePlayer() {
+    document.getElementById('player-bar').classList.add('hidden');
+    document.getElementById('embed-container').innerHTML = '';
   }
-
-  function nextTrack() { alert("Следующий трек (в разработке)"); }
-  function prevTrack() { alert("Предыдущий трек (в разработке)"); }
 </script>
-
-<!-- SoundCloud Widget API -->
-<script src="https://w.soundcloud.com/player/api.js"></script>
 </body>
 </html>

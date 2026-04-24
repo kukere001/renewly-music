@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RenewlyMusic</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
+</head>
+<body class="bg-zinc-950 text-white min-h-screen">
+
+  <div class="max-w-7xl mx-auto px-4 py-6">
+
+    <h1 class="text-4xl font-bold text-center mb-8">RenewlyMusic</h1>
+
+    <div class="text-center mb-6 text-green-400">
+      Client ID загружен успешно ✅
+    </div>
+
+    <!-- Поиск -->
+    <div class="relative max-w-2xl mx-auto mb-10">
+      <input id="search-input" type="text" placeholder="Поиск трека или артиста..." 
+             class="w-full bg-zinc-900 border border-zinc-700 rounded-3xl py-6 px-8 text-xl" 
+             onkeypress="if(event.key==='Enter') searchMusic()">
+      <button onclick="searchMusic()" class="absolute right-4 top-1/2 -translate-y-1/2 bg-orange-500 px-10 py-4 rounded-3xl">Искать</button>
+    </div>
+
+    <div id="main-content"></div>
+  </div>
+
+  <!-- Плеер -->
+  <div id="player-bar" class="fixed bottom-0 left-0 right-0 bg-zinc-900 border-t border-zinc-700 hidden p-4">
+    <div class="max-w-7xl mx-auto flex items-center gap-4">
+      <img id="player-cover" class="w-16 h-16 rounded-2xl object-cover">
+      <div class="flex-1">
+        <div id="player-title" class="font-bold"></div>
+        <div id="player-artist" class="text-zinc-400"></div>
+      </div>
+      <button onclick="togglePlay()" id="play-btn" class="text-4xl"><i class="fa-solid fa-play"></i></button>
+    </div>
+    <audio id="audio" class="hidden"></audio>
+  </div>
+
+<script>
+  const CLIENT_ID = "RF8yvumNwWwVg0aX4r7fHqzIVAtO6nSI";   // ← твой client_id
+
+  async function api(endpoint) {
+    const url = endpoint + (endpoint.includes('?') ? '&' : '?') + `client_id=${CLIENT_ID}`;
+    const res = await fetch(url);
+    return res.json();
+  }
+
+  async function searchMusic() {
+    const query = document.getElementById('search-input').value.trim();
+    if (!query) return;
+
+    const data = await api(`https://api-v2.soundcloud.com/search?q=${encodeURIComponent(query)}&limit=20`);
+    
+    let html = `<h2 class="text-2xl font-bold mb-6">Результаты</h2><div class="grid grid-cols-2 md:grid-cols-3 gap-6">`;
+    
+    data.collection.forEach(item => {
+      if (item.kind === "track") {
+        html += `
+          <div onclick="playTrack(${JSON.stringify(item).replace(/"/g,'&quot;')})" class="bg-zinc-900 rounded-3xl overflow-hidden cursor-pointer">
+            <img src="${item.artwork_url?.replace('-large','-t500x500')}" class="w-full aspect-square object-cover">
+            <div class="p-4">
+              <div class="font-medium">${item.title}</div>
+              <div class="text-sm text-zinc-400">${item.user.username}</div>
+            </div>
+          </div>`;
+      }
+    });
+    html += `</div>`;
+    document.getElementById('main-content').innerHTML = html;
+  }
+
+  async function playTrack(track) {
+    const stream = await api(`https://api-v2.soundcloud.com/tracks/${track.id}/streams`);
+    const url = stream.http_mp3_128_url;
+
+    if (url) {
+      document.getElementById('audio').src = url;
+      document.getElementById('audio').play();
+      document.getElementById('player-cover').src = track.artwork_url?.replace('-large','-t500x500') || '';
+      document.getElementById('player-title').textContent = track.title;
+      document.getElementById('player-artist').textContent = track.user.username;
+      document.getElementById('player-bar').classList.remove('hidden');
+      document.getElementById('play-btn').innerHTML = '<i class="fa-solid fa-pause"></i>';
+    }
+  }
+
+  function togglePlay() {
+    const audio = document.getElementById('audio');
+    if (audio.paused) {
+      audio.play();
+      document.getElementById('play-btn').innerHTML = '<i class="fa-solid fa-pause"></i>';
+    } else {
+      audio.pause();
+      document.getElementById('play-btn').innerHTML = '<i class="fa-solid fa-play"></i>';
+    }
+  }
+</script>
+</body>
+</html>

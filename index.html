@@ -6,186 +6,81 @@
   <title>RenewlyMusic</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
-  <style>
-    .glass { background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(16px); }
-    .neon { text-shadow: 0 0 15px #f97316; }
-    .card-hover:hover { transform: translateY(-8px); }
-  </style>
 </head>
 <body class="bg-zinc-950 text-white min-h-screen">
 
-<header class="sticky top-0 z-50 glass border-b border-white/10">
-  <div class="max-w-7xl mx-auto px-6 py-5 flex items-center justify-between">
-    <div class="flex items-center gap-4">
-      <div class="w-10 h-10 bg-gradient-to-br from-orange-500 to-red-500 rounded-2xl flex items-center justify-center text-3xl">♾️</div>
-      <h1 class="text-3xl font-bold tracking-tighter neon">RenewlyMusic</h1>
-    </div>
+<div class="max-w-6xl mx-auto p-6">
+  <h1 class="text-5xl font-bold text-center mb-10">RenewlyMusic</h1>
 
-    <div class="flex gap-8 text-lg font-medium">
-      <button onclick="switchTab(0)" class="hover:text-orange-400">Главная</button>
-      <button onclick="switchTab(1)" class="hover:text-orange-400">Поиск</button>
-      <button onclick="switchTab(2)" class="hover:text-orange-400">Артисты</button>
-      <button onclick="switchTab(3)" class="hover:text-orange-400">Библиотека ❤️</button>
-    </div>
-  </div>
-</header>
-
-<div class="max-w-7xl mx-auto px-6 py-8">
-
-  <!-- Главная -->
-  <div id="tab-0">
-    <h2 class="text-3xl font-bold mb-6">Тренды сегодня 🔥</h2>
-    <div id="charts" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6"></div>
+  <div class="max-w-2xl mx-auto mb-10">
+    <input id="search-input" placeholder="madk1d, kai angel, гимн россии, липстик..." 
+           class="w-full bg-zinc-900 border border-zinc-700 rounded-3xl py-6 px-8 text-xl">
+    <button onclick="searchMusic()" 
+            class="mt-4 w-full bg-gradient-to-r from-orange-500 to-red-500 py-5 rounded-3xl text-xl font-bold">
+      Искать
+    </button>
   </div>
 
-  <!-- Поиск -->
-  <div id="tab-1" class="hidden">
-    <input id="search-input" placeholder="Поиск треков или артистов..." 
-           class="w-full bg-zinc-900 border border-zinc-700 rounded-3xl py-6 px-8 text-xl mb-8" 
-           onkeypress="if(event.key==='Enter') globalSearch()">
-    <div id="search-results" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6"></div>
-  </div>
-
-  <!-- Артисты -->
-  <div id="tab-2" class="hidden">
-    <input id="username-input" placeholder="Username (kaiangel, madk1d...)" 
-           class="w-full bg-zinc-900 border border-zinc-700 rounded-3xl py-6 px-8 text-xl mb-6">
-    <button onclick="loadArtistProfile()" class="bg-orange-500 px-10 py-4 rounded-3xl">Загрузить профиль</button>
-    <div id="artist-content" class="mt-10"></div>
-  </div>
-
-  <!-- Библиотека -->
-  <div id="tab-3" class="hidden">
-    <h2 class="text-3xl font-bold mb-6">Моя библиотека ❤️</h2>
-    <div id="library" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6"></div>
-  </div>
+  <div id="results" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6"></div>
 </div>
 
 <!-- Плеер -->
 <div id="player-bar" class="fixed bottom-0 left-0 right-0 bg-zinc-900 border-t border-white/10 hidden z-50 p-4">
-  <div class="max-w-7xl mx-auto relative">
-    <button onclick="closePlayer()" class="absolute -top-3 right-4 bg-red-500 text-white rounded-full w-8 h-8 flex items-center justify-center">✕</button>
+  <div class="max-w-6xl mx-auto relative">
+    <button onclick="closePlayer()" class="absolute -top-3 right-4 bg-red-500 text-white rounded-full w-8 h-8 flex items-center justify-center text-xl">✕</button>
     <div id="embed-container"></div>
   </div>
 </div>
 
 <script>
   const CLIENT_ID = "RF8yvumNwWwVg0aX4r7fHqzIVAtO6nSI";
-  let favorites = JSON.parse(localStorage.getItem('renewly_favorites') || '[]');
 
-  function switchTab(n) {
-    document.querySelectorAll('[id^="tab-"]').forEach(t => t.classList.add('hidden'));
-    document.getElementById(`tab-${n}`).classList.remove('hidden');
-    if (n === 3) renderLibrary();
-  }
+  async function searchMusic() {
+    const query = document.getElementById('search-input').value.trim();
+    if (!query) return;
 
-  async function api(endpoint) {
+    const div = document.getElementById('results');
+    div.innerHTML = `<p class="col-span-full text-center py-20 text-zinc-400">Ищем...</p>`;
+
     try {
-      const res = await fetch(`https://corsproxy.io/?${endpoint}&client_id=${CLIENT_ID}`);
-      return await res.json();
+      // Новый более стабильный прокси
+      const res = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(`https://api-v2.soundcloud.com/search?q=${encodeURIComponent(query)}&client_id=${CLIENT_ID}&limit=30`)}`);
+      const data = await res.json();
+
+      let html = '';
+      data.collection.forEach(item => {
+        if (item.kind !== "track") return;
+        html += `
+          <div onclick="playTrack('${item.permalink_url}', '${item.title}', '${item.user.username}', '${item.artwork_url}')" 
+               class="bg-zinc-900 rounded-3xl overflow-hidden cursor-pointer hover:scale-105 transition-all">
+            <img src="${item.artwork_url.replace('-large', '-t500x500')}" class="w-full aspect-square object-cover">
+            <div class="p-4">
+              <div class="font-medium line-clamp-2">${item.title}</div>
+              <div class="text-zinc-400 text-sm">${item.user.username}</div>
+            </div>
+          </div>`;
+      });
+
+      div.innerHTML = html || `<p class="col-span-full text-center text-zinc-400">Ничего не найдено</p>`;
     } catch(e) {
+      div.innerHTML = `<p class="col-span-full text-center text-red-400">Ошибка соединения<br>Попробуй ещё раз</p>`;
       console.error(e);
-      return { collection: [] };
     }
-  }
-
-  // Главная - Тренды
-  async function loadCharts() {
-    const data = await api('https://api-v2.soundcloud.com/charts?kind=top&genre=soundcloud%3Agenres%3Aall-music&limit=20');
-    renderGrid(data.collection || [], 'charts');
-  }
-
-  // Глобальный поиск
-  async function globalSearch() {
-    const q = document.getElementById('search-input').value.trim();
-    if (!q) return;
-    switchTab(1);
-    const data = await api(`https://api-v2.soundcloud.com/search?q=${encodeURIComponent(q)}&limit=30`);
-    renderGrid(data.collection || [], 'search-results');
-  }
-
-  // Профиль артиста
-  async function loadArtistProfile() {
-    const username = document.getElementById('username-input').value.trim();
-    if (!username) return;
-    switchTab(2);
-
-    try {
-      const user = await api(`https://api.soundcloud.com/resolve?url=https://soundcloud.com/${username}`);
-      const tracks = await api(`https://api-v2.soundcloud.com/users/${user.id}/tracks?limit=20`);
-
-      let html = `
-        <div class="flex gap-8 bg-zinc-900 rounded-3xl p-8">
-          <img src="${user.avatar_url.replace('-large', '-t500x500')}" class="w-40 h-40 rounded-3xl object-cover">
-          <div>
-            <h2 class="text-4xl font-bold">${user.username}</h2>
-            <p class="text-zinc-400 text-xl">${user.full_name || ''}</p>
-            <p class="text-orange-400">${user.followers_count.toLocaleString()} подписчиков</p>
-          </div>
-        </div>`;
-
-      html += `<h3 class="text-2xl font-bold mt-10 mb-6">Треки</h3><div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6" id="artist-tracks"></div>`;
-      document.getElementById('artist-content').innerHTML = html;
-
-      renderGrid(tracks.collection || [], 'artist-tracks');
-    } catch(e) {
-      document.getElementById('artist-content').innerHTML = `<p class="text-red-400">Не удалось загрузить профиль. Проверь username.</p>`;
-    }
-  }
-
-  function renderGrid(items, containerId) {
-    const container = document.getElementById(containerId);
-    container.innerHTML = '';
-
-    items.forEach(item => {
-      if (item.kind !== "track") return;
-      const div = document.createElement('div');
-      div.className = "bg-zinc-900 rounded-3xl overflow-hidden cursor-pointer card-hover relative";
-      div.innerHTML = `
-        <img src="${item.artwork_url.replace('-large', '-t500x500')}" class="w-full aspect-square object-cover">
-        <div class="p-4">
-          <div class="font-medium line-clamp-2">${item.title}</div>
-          <div class="text-zinc-400 text-sm">${item.user.username}</div>
-        </div>
-        <button onclick="event.stopImmediatePropagation(); toggleFavorite(${JSON.stringify(item).replace(/"/g,'&quot;')});" 
-                class="absolute top-3 right-3 text-2xl ${favorites.some(f => f.id === item.id) ? 'text-red-500' : 'text-white/50 hover:text-white'}">
-          ❤️
-        </button>`;
-      div.onclick = () => playTrack(item.permalink_url, item.title, item.user.username, item.artwork_url);
-      container.appendChild(div);
-    });
   }
 
   function playTrack(url, title, artist, artwork) {
-    const embed = `https://w.soundcloud.com/player/?url=${encodeURIComponent(url)}&color=%23f97316&auto_play=true&visual=false&single_active=true&height=300`;
-    document.getElementById('embed-container').innerHTML = `<iframe width="100%" height="300" scrolling="no" frameborder="no" src="${embed}" allow="autoplay"></iframe>`;
+    const embedUrl = `https://w.soundcloud.com/player/?url=${encodeURIComponent(url)}&color=%23f97316&auto_play=true&visual=false&single_active=true&height=300`;
+    
+    document.getElementById('embed-container').innerHTML = `
+      <iframe width="100%" height="300" scrolling="no" frameborder="no" 
+              src="${embedUrl}" allow="autoplay"></iframe>`;
+    
     document.getElementById('player-bar').classList.remove('hidden');
   }
 
   function closePlayer() {
     document.getElementById('player-bar').classList.add('hidden');
   }
-
-  function toggleFavorite(track) {
-    const index = favorites.findIndex(f => f.id === track.id);
-    if (index === -1) {
-      favorites.push(track);
-    } else {
-      favorites.splice(index, 1);
-    }
-    localStorage.setItem('renewly_favorites', JSON.stringify(favorites));
-    renderGrid(favorites, 'library'); // обновляем библиотеку
-    alert(index === -1 ? "✅ Добавлено в библиотеку" : "🗑️ Удалено из библиотеки");
-  }
-
-  function renderLibrary() {
-    renderGrid(favorites, 'library');
-  }
-
-  // Инициализация
-  window.onload = () => {
-    loadCharts();
-  };
 </script>
 </body>
 </html>

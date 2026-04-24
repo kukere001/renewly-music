@@ -24,31 +24,40 @@
   <div id="results" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6"></div>
 </div>
 
-<!-- Компактный плеер -->
-<div id="embed-player" class="fixed bottom-0 left-0 right-0 bg-zinc-900 border-t border-white/10 hidden z-50">
-  <div class="max-w-6xl mx-auto relative">
-    <!-- Кнопка закрытия -->
-    <button onclick="closePlayer()" 
-            class="absolute top-3 right-4 text-white bg-black/50 hover:bg-black/80 rounded-full p-2 z-10">
-      ✕
-    </button>
-    
-    <div id="embed-container" class="pt-3 pb-2"></div>
+<!-- Свой красивый плеер -->
+<div id="player-bar" class="fixed bottom-0 left-0 right-0 bg-zinc-900 border-t border-white/10 hidden z-50 p-4">
+  <div class="max-w-6xl mx-auto flex items-center gap-5">
+    <img id="cover" class="w-20 h-20 rounded-2xl object-cover shadow-xl">
+    <div class="flex-1 min-w-0">
+      <div id="title" class="font-bold text-lg truncate"></div>
+      <div id="artist" class="text-zinc-400 truncate"></div>
+    </div>
+    <div class="flex items-center gap-6 text-4xl">
+      <button onclick="prevTrack()" class="hover:text-orange-400"><i class="fa-solid fa-backward"></i></button>
+      <button onclick="togglePlay()" id="play-btn" class="text-5xl text-orange-500"><i class="fa-solid fa-play"></i></button>
+      <button onclick="nextTrack()" class="hover:text-orange-400"><i class="fa-solid fa-forward"></i></button>
+    </div>
   </div>
+  <audio id="audio" class="hidden"></audio>
 </div>
 
 <script>
   const CLIENT_ID = "RF8yvumNwWwVg0aX4r7fHqzIVAtO6nSI";
+  const PROXY = "https://corsproxy.io/?";
+
+  let currentQueue = [];
+  let currentIndex = -1;
+  let audio = document.getElementById('audio');
 
   async function searchMusic() {
     const query = document.getElementById('search-input').value.trim();
     if (!query) return;
 
     const resultsDiv = document.getElementById('results');
-    resultsDiv.innerHTML = `<p class="col-span-full text-center text-zinc-400 py-12">Ищем...</p>`;
+    resultsDiv.innerHTML = `<p class="col-span-full text-center py-12 text-zinc-400">Ищем...</p>`;
 
     try {
-      const url = `https://corsproxy.io/?https://api-v2.soundcloud.com/search?q=${encodeURIComponent(query)}&client_id=${CLIENT_ID}&limit=30`;
+      const url = `${PROXY}https://api-v2.soundcloud.com/search?q=${encodeURIComponent(query)}&client_id=${CLIENT_ID}&limit=30`;
       const res = await fetch(url);
       const data = await res.json();
 
@@ -56,8 +65,8 @@
       data.collection.forEach(item => {
         if (item.kind === "track") {
           html += `
-            <div onclick="playEmbed('${item.permalink_url}', '${item.title}', '${item.user.username}')" 
-                 class="bg-zinc-900 rounded-3xl overflow-hidden cursor-pointer hover:scale-105 transition-all">
+            <div onclick="playTrack(${JSON.stringify(item).replace(/"/g, '&quot;')})" 
+                 class="bg-zinc-900 rounded-3xl overflow-hidden cursor-pointer hover:scale-105 transition">
               <img src="${item.artwork_url.replace('-large', '-t500x500')}" class="w-full aspect-square object-cover">
               <div class="p-4">
                 <div class="font-medium line-clamp-2">${item.title}</div>
@@ -66,28 +75,53 @@
             </div>`;
         }
       });
-
-      resultsDiv.innerHTML = html || `<p class="col-span-full text-center text-zinc-400">Ничего не найдено</p>`;
+      resultsDiv.innerHTML = html || "<p class='col-span-full text-center text-zinc-400'>Ничего не найдено</p>";
     } catch(e) {
-      resultsDiv.innerHTML = `<p class="col-span-full text-center text-red-400">Ошибка загрузки</p>`;
+      resultsDiv.innerHTML = `<p class="col-span-full text-center text-red-400">Ошибка соединения</p>`;
     }
   }
 
-  function playEmbed(trackUrl, title, artist) {
-    const embedUrl = `https://w.soundcloud.com/player/?url=${encodeURIComponent(trackUrl)}&color=%23f97316&auto_play=true&visual=false&single_active=true&height=300`;
+  async function playTrack(track) {
+    currentQueue = [track];
+    currentIndex = 0;
 
-    document.getElementById('embed-container').innerHTML = `
-      <iframe width="100%" height="300" scrolling="no" frameborder="no" 
-              src="${embedUrl}" allow="autoplay">
-      </iframe>`;
+    try {
+      const streamUrl = `${PROXY}https://api-v2.soundcloud.com/tracks/${track.id}/streams?client_id=${CLIENT_ID}`;
+      const res = await fetch(streamUrl);
+      const data = await res.json();
+      
+      const audioUrl = data.http_mp3_128_url || Object.values(data)[0];
 
-    document.getElementById('embed-player').classList.remove('hidden');
+      if (audioUrl) {
+        audio.src = audioUrl;
+        audio.play();
+
+        document.getElementById('cover').src = track.artwork_url.replace('-large', '-t500x500');
+        document.getElementById('title').textContent = track.title;
+        document.getElementById('artist').textContent = track.user.username;
+        document.getElementById('player-bar').classList.remove('hidden');
+        document.getElementById('play-btn').innerHTML = '<i class="fa-solid fa-pause"></i>';
+      } else {
+        alert("Не удалось получить ссылку на трек");
+      }
+    } catch(e) {
+      alert("Не получилось воспроизвести трек (ограничение SoundCloud)");
+      console.error(e);
+    }
   }
 
-  function closePlayer() {
-    document.getElementById('embed-player').classList.add('hidden');
-    document.getElementById('embed-container').innerHTML = '';
+  function togglePlay() {
+    if (audio.paused) {
+      audio.play();
+      document.getElementById('play-btn').innerHTML = '<i class="fa-solid fa-pause"></i>';
+    } else {
+      audio.pause();
+      document.getElementById('play-btn').innerHTML = '<i class="fa-solid fa-play"></i>';
+    }
   }
+
+  function nextTrack() { alert("Следующий трек — в разработке"); }
+  function prevTrack() { alert("Предыдущий трек — в разработке"); }
 </script>
 </body>
 </html>
